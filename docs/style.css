@@ -219,3 +219,4 @@ body.app-body { padding: 16px; height: 100vh; height: 100dvh; overflow: hidden; 
   #grid { grid-template-rows: none; }
   .day { min-height: 58px; }
 }
+.gis-btn { display: flex; justify-content: center; margin-top: 24px; min-height: 44px; }
