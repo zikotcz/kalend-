@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ⚠️ Stejné e-maily jako ADMIN_EMAILS v public/firebase-config.js
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['admin@example.com'];
+    }
+    function isApproved() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+    }
+
+    match /users/{uid} {
+      // Uživatel vidí jen svůj záznam, správce všechny.
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      // Uživatel si může vytvořit jen vlastní záznam, a to pouze ve stavu "pending".
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.email == request.auth.token.email;
+      // Měnit stav (schválit / zamítnout) smí jen správce.
+      allow update, delete: if isAdmin();
+    }
+
+    // Data kalendáře – jen schválení uživatelé a správce.
+    match /events/{eventId} {
+      allow read, write: if isAdmin() || isApproved();
+    }
+  }
+}

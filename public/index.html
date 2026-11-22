@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kalendář – přihlášení</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="card">
+    <div class="logo">📅</div>
+
+    <!-- Načítání -->
+    <section id="loading"><div class="spinner"></div><p>Načítám…</p></section>
+
+    <!-- Nepřihlášen -->
+    <section id="login" class="hidden">
+      <h1>Přihlášení</h1>
+      <p>Přihlaste se svým Google účtem. Nový účet musí nejdřív schválit správce.</p>
+      <button id="google-btn" class="google-btn">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/>
+          <path fill="#FBBC05" d="M10.6 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.2z"/>
+          <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/>
+        </svg>
+        Přihlásit se přes Google
+      </button>
+      <p id="login-error" class="error hidden"></p>
+    </section>
+
+    <!-- Čeká na schválení -->
+    <section id="pending" class="hidden">
+      <img id="pending-photo" class="avatar" alt="" referrerpolicy="no-referrer" />
+      <h1>Čekáte na schválení</h1>
+      <p>Účet <strong id="pending-email"></strong> byl zaregistrován.</p>
+      <p>Správce musí váš přístup potvrdit. Tato stránka se sama přesměruje, jakmile vás schválí.</p>
+      <div class="spinner"></div>
+      <button class="link-btn" data-logout>Odhlásit se</button>
+    </section>
+
+    <!-- Zamítnuto -->
+    <section id="rejected" class="hidden">
+      <h1>Přístup zamítnut</h1>
+      <p>Správce vaši žádost o přístup zamítl.</p>
+      <button class="link-btn" data-logout>Odhlásit se</button>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      auth, db, loginWithGoogle, logout, ensureUserDoc, isAdmin,
+      onAuthStateChanged, onSnapshot,
+    } from "./firebase.js";
+
+    const show = (id) => {
+      for (const s of document.querySelectorAll("main > section"))
+        s.classList.toggle("hidden", s.id !== id);
+    };
+    const errEl = document.getElementById("login-error");
+    let unsub = null;
+
+    document.getElementById("google-btn").onclick = async () => {
+      errEl.classList.add("hidden");
+      try { await loginWithGoogle(); }
+      catch (e) {
+        if (e.code !== "auth/popup-closed-by-user") {
+          errEl.textContent = "Přihlášení se nezdařilo: " + e.message;
+          errEl.classList.remove("hidden");
+        }
+      }
+    };
+    document.querySelectorAll("[data-logout]").forEach((b) => (b.onclick = logout));
+
+    onAuthStateChanged(auth, async (user) => {
+      if (unsub) { unsub(); unsub = null; }
+      if (!user) return show("login");
+      if (isAdmin(user)) return (location.href = "app.html");
+
+      show("loading");
+      try {
+        const ref = await ensureUserDoc(user);
+        unsub = onSnapshot(ref, (snap) => {
+          const status = snap.data()?.status;
+          if (status === "approved") location.href = "app.html";
+          else if (status === "rejected") show("rejected");
+          else {
+            document.getElementById("pending-email").textContent = user.email;
+            const img = document.getElementById("pending-photo");
+            img.src = user.photoURL || ""; img.classList.toggle("hidden", !user.photoURL);
+            show("pending");
+          }
+        });
+      } catch (e) {
+        errEl.textContent = "Chyba: " + e.message;
+        errEl.classList.remove("hidden");
+        show("login");
+      }
+    });
+  </script>
+</body>
+</html>

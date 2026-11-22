@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kalendář – schvalování</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="card wide hidden" id="admin">
+    <div class="topbar">
+      <h1>Schvalování přístupů</h1>
+      <a href="app.html">← Zpět do kalendáře</a>
+    </div>
+    <p>Noví uživatelé po přihlášení přes Google čekají, dokud je tady nepotvrdíte.</p>
+    <table>
+      <thead><tr><th>Uživatel</th><th>Stav</th><th></th></tr></thead>
+      <tbody id="rows"><tr><td colspan="3">Načítám…</td></tr></tbody>
+    </table>
+  </main>
+
+  <script type="module">
+    import {
+      auth, db, isAdmin, onAuthStateChanged, onSnapshot, collection, query,
+      orderBy, doc, updateDoc, serverTimestamp,
+    } from "./firebase.js";
+
+    const LABEL = { pending: "čeká", approved: "schválen", rejected: "zamítnut" };
+    const rows = document.getElementById("rows");
+
+    const setStatus = (uid, status) =>
+      updateDoc(doc(db, "users", uid), {
+        status, decidedAt: serverTimestamp(), decidedBy: auth.currentUser.email,
+      }).catch((e) => alert("Nepodařilo se uložit: " + e.message));
+
+    function render(snap) {
+      rows.replaceChildren();
+      if (snap.empty) {
+        rows.innerHTML = '<tr><td colspan="3">Zatím žádní uživatelé.</td></tr>';
+        return;
+      }
+      snap.forEach((d) => {
+        const u = d.data();
+        const tr = document.createElement("tr");
+        const who = document.createElement("td");
+        who.className = "email";
+        who.textContent = (u.name ? u.name + " – " : "") + u.email;
+        const st = document.createElement("td");
+        st.innerHTML = `<span class="badge ${u.status}">${LABEL[u.status] ?? u.status}</span>`;
+        const act = document.createElement("td");
+        act.className = "actions";
+        if (u.status !== "approved") act.append(btn("Schválit", "ok", () => setStatus(d.id, "approved")));
+        if (u.status !== "rejected") act.append(btn(u.status === "approved" ? "Odebrat" : "Zamítnout", "bad", () => setStatus(d.id, "rejected")));
+        tr.append(who, st, act);
+        rows.append(tr);
+      });
+    }
+    function btn(text, cls, onclick) {
+      const b = document.createElement("button");
+      b.className = "btn " + cls; b.textContent = text; b.onclick = onclick;
+      return b;
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user || !isAdmin(user)) return (location.href = "index.html");
+      document.getElementById("admin").classList.remove("hidden");
+      onSnapshot(query(collection(db, "users"), orderBy("createdAt", "desc")), render,
+        (e) => (rows.innerHTML = `<tr><td colspan="3" class="error">Chyba: ${e.message}</td></tr>`));
+    });
+  </script>
+</body>
+</html>
