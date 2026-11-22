@@ -3,12 +3,12 @@
 // 3) Firestore Database → vytvořte databázi
 // 4) Project settings → Your apps → Web app → zkopírujte config sem:
 export const firebaseConfig = {
-  apiKey: "VLOZTE_API_KEY",
-  authDomain: "VAS-PROJEKT.firebaseapp.com",
-  projectId: "VAS-PROJEKT",
-  storageBucket: "VAS-PROJEKT.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:0000000000000000",
+  apiKey: "AIzaSyA6sC1oWY-XR7z0hDtk_p7CSBxsiTf3yY4",
+  authDomain: "kalend-4f96f.firebaseapp.com",
+  projectId: "kalend-4f96f",
+  storageBucket: "kalend-4f96f.firebasestorage.app",
+  messagingSenderId: "795160808707",
+  appId: "1:795160808707:web:b61cc763a6ac0762b2ad36",
 };
 
 // E-maily správců, kteří schvalují přístup (musí odpovídat i firestore.rules).
