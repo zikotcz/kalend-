@@ -30,7 +30,7 @@
     import {
       auth, db, isAdmin, onAuthStateChanged, onSnapshot, collection, query,
       orderBy, doc, updateDoc, serverTimestamp,
-    } from "./firebase.js";
+    } from "./firebase.js?v=2";
 
     const LABEL = { pending: "čeká", approved: "schválen", rejected: "zamítnut" };
     const rows = document.getElementById("rows");

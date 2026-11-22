@@ -6,7 +6,7 @@ import {
   getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection,
   query, orderBy, serverTimestamp, addDoc, deleteDoc, where,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { firebaseConfig, ADMIN_EMAILS, GOOGLE_CLIENT_ID } from "./firebase-config.js";
+import { firebaseConfig, ADMIN_EMAILS, GOOGLE_CLIENT_ID } from "./firebase-config.js?v=2";
 export { GOOGLE_CLIENT_ID };
 
 const app = initializeApp(firebaseConfig);

@@ -16,4 +16,4 @@ export const ADMIN_EMAILS = ["honzik.kozak.hkk@gmail.com"];
 
 // Web client ID z Firebase: Authentication → Sign-in method → Google → Web SDK configuration.
 // Když je vyplněné, přihlášení jde přímo přes Google tlačítko (funguje i v Safari na iPhonu).
-export const GOOGLE_CLIENT_ID = "";
+export const GOOGLE_CLIENT_ID = "795160808707-6qr1ttnj90lvs69gms7f52qbpp0uq5fp.apps.googleusercontent.com";
