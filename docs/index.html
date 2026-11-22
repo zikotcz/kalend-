@@ -82,7 +82,10 @@
     // protože nepotřebuje přesměrování přes doménu firebaseapp.com.
     function showError(msg) { errEl.textContent = msg; errEl.classList.remove("hidden"); }
     if (GOOGLE_CLIENT_ID) {
+      // Staré přihlášení (přes firebaseapp.com) v Safari nefunguje – nepoužíváme ho.
+      document.getElementById("google-btn").classList.add("hidden");
       const s = document.createElement("script");
+      s.onerror = () => showError("Nepodařilo se načíst přihlašovací tlačítko Google. Obnovte stránku.");
       s.src = "https://accounts.google.com/gsi/client"; s.async = true;
       s.onload = () => {
         google.accounts.id.initialize({
