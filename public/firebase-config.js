@@ -12,4 +12,4 @@ export const firebaseConfig = {
 };
 
 // E-maily správců, kteří schvalují přístup (musí odpovídat i firestore.rules).
-export const ADMIN_EMAILS = ["admin@example.com"];
+export const ADMIN_EMAILS = ["honzik.kozak.hkk@gmail.com"];
