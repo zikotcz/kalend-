@@ -1,4 +1,4 @@
-# Kalendář – přihlášení přes Google se schvalováním
+# Sdílený kalendář – přihlášení přes Google se schvalováním
 
 Uživatel se přihlásí Google účtem → vytvoří se mu záznam se stavem **pending** →
 vidí stránku „Čekáte na schválení“. Jakmile ho správce na `admin.html` schválí,
@@ -6,19 +6,24 @@ stránka ho automaticky (živě) pustí do `app.html`. Bez schválení se k dat�
 hlídají to i pravidla Firestore, nejen frontend.
 
 ## Soubory
-- `public/index.html` – přihlášení + čekací obrazovka
-- `public/app.html` – chráněná stránka (sem patří kalendář)
-- `public/admin.html` – schvalování / zamítání uživatelů
-- `public/firebase-config.js` – **sem vložte konfiguraci a e-mail správce**
+- `docs/index.html` – přihlášení + čekací obrazovka
+- `docs/app.html` – sdílený kalendář (měsíční přehled, přidávání / úprava / mazání událostí, živá synchronizace)
+- `docs/admin.html` – schvalování / zamítání uživatelů
+- `docs/firebase-config.js` – **sem vložte konfiguraci a e-mail správce**
 - `firestore.rules` – bezpečnostní pravidla (**i sem e-mail správce**)
 
 ## Nastavení
 1. Na <https://console.firebase.google.com> vytvořte projekt.
 2. **Authentication → Sign-in method → Google** → zapnout.
 3. **Firestore Database** → vytvořit databázi.
-4. **Project settings → Your apps → Web** → zkopírovat config do `public/firebase-config.js`.
+4. **Project settings → Your apps → Web** → zkopírovat config do `docs/firebase-config.js`.
 5. Do `ADMIN_EMAILS` (v `firebase-config.js`) i do `firestore.rules` napište svůj Gmail.
-6. Nasazení:
+6. **Hostování na GitHub Pages:** repozitář musí být veřejný → Settings → Pages →
+   *Deploy from a branch* → vybrat větev a složku **/docs** → Save.
+   Doménu `zikotcz.github.io` přidat ve Firebase: **Authentication → Settings → Authorized domains**.
+   Obsah `firestore.rules` vložit do **Firestore → Rules → Publish**.
+
+   Alternativně Firebase Hosting:
    ```bash
    npm install -g firebase-tools
    firebase login

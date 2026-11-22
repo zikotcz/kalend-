@@ -4,7 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection,
-  query, orderBy, serverTimestamp,
+  query, orderBy, serverTimestamp, addDoc, deleteDoc, where,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig, ADMIN_EMAILS } from "./firebase-config.js";
 
@@ -41,5 +41,5 @@ export async function ensureUserDoc(user) {
 
 export {
   onAuthStateChanged, doc, updateDoc, onSnapshot, collection, query, orderBy,
-  serverTimestamp,
+  serverTimestamp, addDoc, deleteDoc, where,
 };

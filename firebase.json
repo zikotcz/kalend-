@@ -1,4 +1,4 @@
 {
-  "hosting": { "public": "public", "ignore": ["**/.*"] },
+  "hosting": { "public": "docs", "ignore": ["**/.*"] },
   "firestore": { "rules": "firestore.rules" }
 }

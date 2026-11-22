@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sdílený kalendář</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="app-body">
+  <main class="cal hidden" id="app">
+    <header class="cal-head">
+      <h1>📅 Sdílený kalendář</h1>
+      <div class="cal-user">
+        <span id="who"></span>
+        <a id="admin-link" class="hidden" href="admin.html">Správa uživatelů</a>
+        <button class="link-btn" id="logout">Odhlásit</button>
+      </div>
+    </header>
+
+    <nav class="cal-nav">
+      <button class="nav-btn" id="prev" aria-label="Předchozí měsíc">‹</button>
+      <h2 id="month-title"></h2>
+      <button class="nav-btn" id="next" aria-label="Další měsíc">›</button>
+      <button class="nav-btn today-btn" id="today">Dnes</button>
+    </nav>
+
+    <div class="cal-grid" id="weekdays"></div>
+    <div class="cal-grid" id="grid"></div>
+    <p id="cal-error" class="error hidden"></p>
+  </main>
+
+  <!-- Dialog: den + přidání / úprava události -->
+  <dialog id="day-dialog">
+    <form method="dialog" class="dlg-close"><button aria-label="Zavřít">✕</button></form>
+    <h3 id="day-title"></h3>
+    <ul id="day-events" class="day-events"></ul>
+
+    <form id="event-form" class="event-form">
+      <h4 id="form-title">Nová událost</h4>
+      <label>Název
+        <input name="title" required maxlength="200" placeholder="Např. Trénink, Narozeniny…" />
+      </label>
+      <div class="row">
+        <label>Datum <input name="date" type="date" required /></label>
+        <label>Čas od <input name="time" type="time" /></label>
+        <label>Čas do <input name="end" type="time" /></label>
+      </div>
+      <label>Poznámka
+        <textarea name="note" rows="2" maxlength="1000"></textarea>
+      </label>
+      <div class="form-actions">
+        <button type="button" class="btn bad hidden" id="delete-btn">Smazat</button>
+        <button type="button" class="btn ghost hidden" id="cancel-edit">Zrušit úpravu</button>
+        <button type="submit" class="btn primary" id="save-btn">Přidat</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module">
+    import {
+      auth, db, logout, isAdmin, onAuthStateChanged, doc, onSnapshot, collection,
+      query, where, orderBy, addDoc, updateDoc, deleteDoc, serverTimestamp,
+    } from "./firebase.js";
+
+    const MONTHS = ["leden","únor","březen","duben","květen","červen","červenec","srpen","září","říjen","listopad","prosinec"];
+    const DAYS = ["Po","Út","St","Čt","Pá","So","Ne"];
+    const COLORS = ["#2563eb","#16a34a","#db2777","#ea580c","#7c3aed","#0891b2","#ca8a04","#dc2626"];
+
+    const $ = (id) => document.getElementById(id);
+    const pad = (n) => String(n).padStart(2, "0");
+    const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const colorFor = (uid) => COLORS[[...uid].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
+
+    let me = null, admin = false;
+    let cursor = new Date(); cursor.setDate(1);
+    let events = [];          // události ve viditelném rozsahu
+    let unsubEvents = null;
+    let openDate = null;      // otevřený den v dialogu
+    let editingId = null;     // upravovaná událost
+
+    $("weekdays").innerHTML = DAYS.map((d) => `<div class="wd">${d}</div>`).join("");
+    $("logout").onclick = async () => { await logout(); location.href = "index.html"; };
+    $("prev").onclick = () => { cursor.setMonth(cursor.getMonth() - 1); load(); };
+    $("next").onclick = () => { cursor.setMonth(cursor.getMonth() + 1); load(); };
+    $("today").onclick = () => { cursor = new Date(); cursor.setDate(1); load(); };
+
+    // ---------- Přihlášení / oprávnění ----------
+    let started = false;
+    onAuthStateChanged(auth, (user) => {
+      if (!user) return (location.href = "index.html");
+      me = user; admin = isAdmin(user);
+      const start = () => {
+        if (started) return; started = true;
+        $("who").textContent = user.displayName || user.email;
+        $("admin-link").classList.toggle("hidden", !admin);
+        $("app").classList.remove("hidden");
+        load();
+      };
+      if (admin) return start();
+      onSnapshot(doc(db, "users", user.uid), (snap) => {
+        if (snap.data()?.status === "approved") start();
+        else location.href = "index.html";
+      }, () => (location.href = "index.html"));
+    });
+
+    // ---------- Načtení měsíce (živě) ----------
+    function gridRange() {
+      const first = new Date(cursor);
+      const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
+      const end = new Date(start); end.setDate(start.getDate() + 41);
+      return [start, end];
+    }
+
+    function load() {
+      $("month-title").textContent = `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`;
+      const [start, end] = gridRange();
+      if (unsubEvents) unsubEvents();
+      render();
+      const q = query(collection(db, "events"),
+        where("date", ">=", iso(start)), where("date", "<=", iso(end)), orderBy("date"));
+      unsubEvents = onSnapshot(q, (snap) => {
+        events = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+        $("cal-error").classList.add("hidden");
+        render();
+        if ($("day-dialog").open) renderDay();
+      }, (e) => {
+        $("cal-error").textContent = "Nepodařilo se načíst události: " + e.message;
+        $("cal-error").classList.remove("hidden");
+      });
+    }
+
+    function render() {
+      const [start] = gridRange();
+      const today = iso(new Date());
+      const grid = $("grid");
+      grid.replaceChildren();
+      for (let i = 0; i < 42; i++) {
+        const d = new Date(start); d.setDate(start.getDate() + i);
+        const key = iso(d);
+        const cell = document.createElement("button");
+        cell.className = "day";
+        if (d.getMonth() !== cursor.getMonth()) cell.classList.add("other");
+        if (key === today) cell.classList.add("today");
+        cell.onclick = () => openDay(key);
+
+        const num = document.createElement("span");
+        num.className = "num"; num.textContent = d.getDate();
+        cell.append(num);
+
+        const dayEv = events.filter((e) => e.date === key);
+        dayEv.slice(0, 3).forEach((e) => {
+          const chip = document.createElement("span");
+          chip.className = "chip";
+          chip.style.setProperty("--c", colorFor(e.createdBy || ""));
+          chip.textContent = (e.time ? e.time + " " : "") + e.title;
+          chip.title = `${e.title} – ${e.createdByName || ""}`;
+          cell.append(chip);
+        });
+        if (dayEv.length > 3) {
+          const more = document.createElement("span");
+          more.className = "more"; more.textContent = `+${dayEv.length - 3} další`;
+          cell.append(more);
+        }
+        grid.append(cell);
+      }
+    }
+
+    // ---------- Dialog dne ----------
+    const dlg = $("day-dialog");
+    const form = $("event-form");
+
+    function openDay(key) {
+      openDate = key;
+      resetForm();
+      renderDay();
+      dlg.showModal();
+    }
+
+    function canEdit(e) { return admin || e.createdBy === me.uid; }
+
+    function renderDay() {
+      const d = new Date(openDate + "T00:00");
+      $("day-title").textContent = d.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      const list = $("day-events");
+      list.replaceChildren();
+      const dayEv = events.filter((e) => e.date === openDate);
+      if (!dayEv.length) {
+        list.innerHTML = '<li class="empty">Žádné události.</li>';
+      }
+      dayEv.forEach((e) => {
+        const li = document.createElement("li");
+        li.style.setProperty("--c", colorFor(e.createdBy || ""));
+        const t = document.createElement("div"); t.className = "ev-title";
+        t.textContent = (e.time ? e.time + (e.end ? "–" + e.end : "") + "  " : "") + e.title;
+        const m = document.createElement("div"); m.className = "ev-meta";
+        m.textContent = "Přidal(a): " + (e.createdByName || "?");
+        li.append(t);
+        if (e.note) { const n = document.createElement("div"); n.className = "ev-note"; n.textContent = e.note; li.append(n); }
+        li.append(m);
+        if (canEdit(e)) {
+          const b = document.createElement("button");
+          b.className = "link-btn small"; b.textContent = "Upravit";
+          b.onclick = () => startEdit(e);
+          li.append(b);
+        }
+        list.append(li);
+      });
+    }
+
+    function resetForm() {
+      editingId = null;
+      form.reset();
+      form.date.value = openDate;
+      $("form-title").textContent = "Nová událost";
+      $("save-btn").textContent = "Přidat";
+      $("delete-btn").classList.add("hidden");
+      $("cancel-edit").classList.add("hidden");
+    }
+
+    function startEdit(e) {
+      editingId = e.id;
+      form.title.value = e.title; form.date.value = e.date;
+      form.time.value = e.time || ""; form.end.value = e.end || ""; form.note.value = e.note || "";
+      $("form-title").textContent = "Upravit událost";
+      $("save-btn").textContent = "Uložit";
+      $("delete-btn").classList.remove("hidden");
+      $("cancel-edit").classList.remove("hidden");
+      form.title.focus();
+    }
+
+    $("cancel-edit").onclick = resetForm;
+
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const data = {
+        title: form.title.value.trim(), date: form.date.value,
+        time: form.time.value, end: form.end.value, note: form.note.value.trim(),
+      };
+      if (!data.title || !data.date) return;
+      $("save-btn").disabled = true;
+      try {
+        if (editingId) {
+          await updateDoc(doc(db, "events", editingId), { ...data, updatedAt: serverTimestamp() });
+        } else {
+          await addDoc(collection(db, "events"), {
+            ...data, createdBy: me.uid, createdByName: me.displayName || me.email,
+            createdAt: serverTimestamp(),
+          });
+        }
+        openDate = data.date;
+        resetForm(); renderDay();
+      } catch (e) { alert("Uložení se nezdařilo: " + e.message); }
+      finally { $("save-btn").disabled = false; }
+    };
+
+    $("delete-btn").onclick = async () => {
+      if (!editingId || !confirm("Opravdu smazat tuto událost?")) return;
+      try { await deleteDoc(doc(db, "events", editingId)); resetForm(); }
+      catch (e) { alert("Smazání se nezdařilo: " + e.message); }
+    };
+  </script>
+</body>
+</html>
